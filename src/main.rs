@@ -1,6 +1,7 @@
 use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
 use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::Relaxed;
 
 fn main() {
     let mut alloc = Box::new(42);
@@ -33,6 +34,15 @@ impl<T> Deref for Arc<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
         &self.data().data
+    }
+}
+
+impl <T> Clone for Arc<T> {
+    fn clone(&self) -> Self {
+        self.data().ref_count.fetch_add(1, Relaxed);
+        Arc {
+            ptr: self.ptr
+        }
     }
 }
 impl <T>Arc<T> {
