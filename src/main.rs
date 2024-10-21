@@ -39,12 +39,25 @@ impl<T> Deref for Arc<T> {
 
 impl <T> Clone for Arc<T> {
     fn clone(&self) -> Self {
-        self.data().ref_count.fetch_add(1, Relaxed);
+        if self.data().ref_count.fetch_add(1, Relaxed) > usize::Max / 2 {
+            std::process::abort();
+        };
+
         Arc {
             ptr: self.ptr
         }
     }
 }
+
+impl <T> Drop for Arc<T> {
+    fn drop(&mut self) {
+        // TODO memory ordering
+        if self.data().ref_count.fetch_sub(1, todo!()) == 1 {
+            unsafe {drop(Box::from_raw(self.ptr.as_ptr())) }
+        }
+    }
+}
+
 impl <T>Arc<T> {
     fn new(data: T) -> Arc<T> {
         Arc {
