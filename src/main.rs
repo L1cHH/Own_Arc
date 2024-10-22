@@ -97,6 +97,10 @@ impl <T>Arc<T> {
             None
         }
     }
+
+    fn downgrade(arc: &Self) -> Weak<T> {
+        arc.weak.clone()
+    }
 }
 
 pub struct Weak<T> {
@@ -106,6 +110,29 @@ pub struct Weak<T> {
 impl <T> Weak<T> {
     fn data(&self) -> &ArcData<T> {
         unsafe { self.ptr.as_ref() }
+    }
+
+    fn upgrade(&self) -> Option<Arc<T>> {
+
+        let mut n = self.data().data_ref_count.load(Relaxed);
+
+        loop {
+            if n == 0 {
+                return None
+            }
+
+            if let Err(current_ref_count) =
+                self
+                    .data()
+                    .data_ref_count
+                    .compare_exchange_weak(n, n + 1, Relaxed, Relaxed)
+            {
+                n = current_ref_count;
+                continue
+            }
+
+            return Some(Arc {weak: self.clone()})
+        }
     }
 }
 
@@ -131,3 +158,4 @@ impl <T> Drop for Weak<T> {
 
 unsafe impl<T: Sync + Send> Send for Weak<T> {}
 unsafe impl<T: Sync + Send> Sync for Weak<T> {}
+
